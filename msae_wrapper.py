@@ -425,6 +425,66 @@ class MSAEWrapper(nn.Module):
         
         return cls.load_from_checkpoint(checkpoint_path, device=device, **kwargs)
 
+    @classmethod
+    def load_many(cls, name: str, local: bool = True, layers: list = None, 
+                device: str = "cuda", decoder: bool = True, pattern: str = None):
+        """
+        SAeUron compatibility method for loading multiple SAEs
+        For MSAE, we'll just load one model but return it in the expected format
+        """
+        # For MSAE, we typically have one checkpoint, so we'll return a dict with one entry
+        from pathlib import Path
+        
+        if local:
+            path_obj = Path(name)
+            if path_obj.is_file():
+                # Single checkpoint file
+                msae = cls.load_from_checkpoint(str(path_obj), device=device)
+                return {"msae": msae}
+            elif path_obj.is_dir():
+                # Directory with checkpoint(s)
+                msae_files = list(path_obj.glob("*.pth"))
+                if msae_files:
+                    results = {}
+                    for i, checkpoint_path in enumerate(msae_files):
+                        key = f"msae_{i}" if len(msae_files) > 1 else "msae"
+                        results[key] = cls.load_from_checkpoint(str(checkpoint_path), device=device)
+                    return results
+                else:
+                    raise FileNotFoundError(f"No .pth checkpoints found in {path_obj}")
+        else:
+            # Non-local loading (would need HuggingFace hub implementation)
+            raise NotImplementedError("Non-local loading not implemented for MSAE")
+
+    def save_to_disk(self, path: str):
+        """
+        SAeUron compatibility method for saving
+        For MSAE, we'll save our wrapper config and point to original checkpoint
+        """
+        from pathlib import Path
+        import json
+        
+        path_obj = Path(path)
+        path_obj.mkdir(parents=True, exist_ok=True)
+        
+        # Save config for compatibility
+        config = self.get_config()
+        with open(path_obj / "msae_config.json", "w") as f:
+            json.dump(config, f, indent=2)
+        
+        print(f"MSAE config saved to {path_obj}")
+        print(f"Note: Original checkpoint is at {self.msae_checkpoint_path}")
+
+    @property
+    def device(self):
+        """SAeUron compatibility - return device"""
+        return self._device if hasattr(self, '_device') else self.msae_model.encoder.device
+
+    @device.setter  
+    def device(self, value):
+        """SAeUron compatibility - set device"""
+        self._device = value
+
 # Main class alias for easy import
 Sae = MSAEWrapper
 

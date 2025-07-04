@@ -1,0 +1,7 @@
+{
+  "msae_input_dim": 512,
+  "msae_latent_dim": 2048,
+  "target_dim": 512,
+  "checkpoint_path": "/data/selena/MSAE/2048_512_TopKReLU_64_UW_False_False_0.0_imagenet_ViT-B~32_train_image_1281167_512.pth",
+  "k": 64
+}
