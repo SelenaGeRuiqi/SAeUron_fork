@@ -1,116 +1,149 @@
 import torch
+import torch.nn as nn
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from msae_wrapper import Sae
 from SAE.hooked_sd_noised_pipeline import HookedStableDiffusionPipeline
-import utils.hooks as hooks
-from PIL import Image
 
-def test_concept_control():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
+class FinalMSAEController:
+    def __init__(self, msae_path, device='cuda'):
+        self.device = device
+        
+        # Load MSAE wrapper
+        self.msae = Sae.load_from_disk(msae_path, device=device)
+        
+        # Create projection layers with consistent dtype
+        self.proj_640_to_512 = nn.Linear(640, 512, dtype=torch.float16, device=device)
+        self.proj_512_to_640 = nn.Linear(512, 640, dtype=torch.float16, device=device)
+        
+        # Initialize projections
+        with torch.no_grad():
+            nn.init.xavier_uniform_(self.proj_640_to_512.weight)
+            nn.init.zeros_(self.proj_640_to_512.bias)
+            nn.init.xavier_uniform_(self.proj_512_to_640.weight)
+            nn.init.zeros_(self.proj_512_to_640.bias)
+        
+        print("✅ Final MSAE Controller ready")
     
-    # Load MSAE
+    def apply_intervention(self, activations_640d, multiplier=1.0, num_features=5):
+        """Apply MSAE intervention with proper dtype handling"""
+        original_shape = activations_640d.shape
+        
+        # Ensure consistent dtype
+        activations_640d = activations_640d.to(torch.float16)
+        
+        # Flatten spatial: [B, C, H, W] -> [B*H*W, C]
+        spatial_tokens = activations_640d.permute(0, 2, 3, 1).reshape(-1, 640)
+        
+        with torch.no_grad():
+            # Project 640D -> 512D (ensure dtype consistency)
+            tokens_512d = self.proj_640_to_512(spatial_tokens.to(torch.float16))
+            
+            # Use wrapper's encode method
+            encoded = self.msae.encode(tokens_512d)
+            
+            if hasattr(encoded, 'top_indices') and encoded.top_indices.numel() > 0:
+                # Get feature indices for intervention
+                feature_indices = encoded.top_indices[0][:num_features]
+                
+                # Apply intervention using wrapper's manipulation method
+                manipulated_512d = self.msae.manipulate_features(
+                    tokens_512d,
+                    feature_indices=feature_indices,
+                    multiplier=multiplier
+                )
+                
+                # Project back to 640D
+                manipulated_640d = self.proj_512_to_640(manipulated_512d.to(torch.float16))
+                
+                # Reshape to original format
+                modified_activations = manipulated_640d.reshape(
+                    original_shape[0], original_shape[2], original_shape[3], original_shape[1]
+                ).permute(0, 3, 1, 2)
+                
+                # Match original dtype
+                modified_activations = modified_activations.to(activations_640d.dtype)
+                
+                return modified_activations, True
+        
+        return activations_640d, False
+
+def test_final_concept_control():
+    device = "cuda"
+    
+    # Create controller
     msae_path = "/data/selena/MSAE/2048_512_TopKReLU_64_UW_False_False_0.0_imagenet_ViT-B~32_train_image_1281167_512.pth"
-    msae = Sae.load_from_disk(msae_path, device=device)
-    print("✅ MSAE loaded")
+    controller = FinalMSAEController(msae_path, device)
     
-    # Load hooked diffusion pipeline
+    # Load pipeline
     pipe = HookedStableDiffusionPipeline.from_pretrained(
         "CompVis/stable-diffusion-v1-4",
         torch_dtype=torch.float16,
         cache_dir='.cache'
     ).to(device)
-    print("✅ Hooked diffusion pipeline loaded")
     
-    # Test hookpoint
-    hookpoint = "unet.up_blocks.1.attentions.2"
-    print(f"Testing hookpoint: {hookpoint}")
+    # Test different strengths
+    test_configs = [
+        (0.0, "baseline"),
+        (-3.0, "suppressed"),
+        (3.0, "enhanced")
+    ]
     
-    # Generate baseline image (no intervention)
-    prompt = "a red car in a city street"
-    print(f"Prompt: '{prompt}'")
-    
-    with torch.no_grad():
-        print("Generating baseline image...")
-        baseline_image = pipe(
-            prompt,
-            num_inference_steps=20,
-            guidance_scale=7.5,
-            generator=torch.Generator().manual_seed(42)
-        ).images[0]
-        baseline_image.save("baseline_image.png")
-        print("✅ Baseline image saved as 'baseline_image.png'")
+    for multiplier, name in test_configs:
+        print(f"\nGenerating {name} image (multiplier: {multiplier})...")
         
-        # Test with concept intervention
-        print("Testing concept intervention...")
+        intervention_count = 0
         
-        # Create a simple intervention hook
-        def intervention_hook(module, input, output):
-            # Get the activations
-            activations = output[0] if isinstance(output, tuple) else output
-            original_shape = activations.shape
+        def msae_hook(module, input, output):
+            nonlocal intervention_count
             
-            # Flatten for MSAE processing (if needed)
-            batch_size = activations.shape[0]
-            flattened = activations.reshape(batch_size, -1)
+            if multiplier == 0.0:
+                return output
             
-            # Apply MSAE intervention if dimensions match
-            if flattened.shape[-1] == 512:  # MSAE input dimension
-                print(f"  Applying MSAE intervention to {original_shape}")
+            try:
+                activations = output[0] if isinstance(output, tuple) else output
+                print(f"  Processing: {activations.shape}, dtype: {activations.dtype}")
                 
-                # Get important features
-                important_features = msae.get_feature_activations(flattened, percentile=95.0)
-                feature_indices = torch.nonzero(important_features[0] > 0).squeeze()[:5]  # Top 5 features
-                
-                if len(feature_indices) > 0:
-                    # Apply concept suppression (negative multiplier)
-                    modified = msae.manipulate_features(
-                        flattened,
-                        feature_indices=feature_indices,
-                        multiplier=-3.0  # Strong suppression
+                if activations.shape[1] == 640:
+                    modified, success = controller.apply_intervention(
+                        activations, multiplier=multiplier, num_features=8
                     )
                     
-                    # Reshape back
-                    modified_activations = modified.reshape(original_shape)
-                    return (modified_activations,) if isinstance(output, tuple) else modified_activations
+                    if success:
+                        intervention_count += 1
+                        print(f"  ✅ MSAE intervention #{intervention_count} applied!")
+                        return (modified,) if isinstance(output, tuple) else modified
+                        
+            except Exception as e:
+                print(f"  ⚠️ Hook error: {e}")
+                import traceback
+                traceback.print_exc()
             
             return output
         
-        # Register hook
-        hook_handle = None
+        # Register hook and generate
+        target_module = pipe.unet.down_blocks[1].attentions[1]
+        hook_handle = target_module.register_forward_hook(msae_hook)
+        
         try:
-            target_module = pipe.unet
-            for name in hookpoint.split('.')[1:]:  # Skip 'unet'
-                target_module = getattr(target_module, name)
-            hook_handle = target_module.register_forward_hook(intervention_hook)
-            print(f"✅ Hook registered on {hookpoint}")
+            with torch.no_grad():
+                image = pipe(
+                    "a red car in a city street",
+                    num_inference_steps=20,
+                    guidance_scale=7.5,
+                    generator=torch.Generator().manual_seed(42)
+                ).images[0]
             
-            # Generate with intervention
-            print("Generating image with MSAE intervention...")
-            intervened_image = pipe(
-                prompt,
-                num_inference_steps=20,
-                guidance_scale=7.5,
-                generator=torch.Generator().manual_seed(42)  # Same seed for comparison
-            ).images[0]
-            intervened_image.save("intervened_image.png")
-            print("✅ Intervened image saved as 'intervened_image.png'")
-            
-        except Exception as e:
-            print(f"Hook registration failed: {e}")
-            print("This is expected - we need to match MSAE dimensions with actual activations")
+            filename = f"dtype_fixed_msae_{name}_mult{multiplier}.png"
+            image.save(filename)
+            print(f"  ✅ Saved: {filename}")
+            print(f"  🎯 Total interventions applied: {intervention_count}")
             
         finally:
-            if hook_handle:
-                hook_handle.remove()
+            hook_handle.remove()
     
-    print("\n🎯 Concept control test completed!")
-    print("Generated files:")
-    print("  - baseline_image.png")
-    print("  - intervened_image.png (if successful)")
-    return True
+    print(f"\n🎉 Dtype-fixed concept control test complete!")
 
 if __name__ == "__main__":
-    test_concept_control()
+    test_final_concept_control()
