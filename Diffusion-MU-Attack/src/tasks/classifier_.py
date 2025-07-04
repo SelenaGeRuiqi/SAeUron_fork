@@ -19,7 +19,7 @@ sys.path.append("..")
 import pickle
 
 from SAE.hooked_sd_noised_pipeline import HookedStableDiffusionPipeline
-from SAE.sae import Sae
+from msae_wrapper import Sae  # MSAE wrapper
 from SAE.unlearning_utils import (
     compute_feature_importance,
     get_percentile_threshold,

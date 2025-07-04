@@ -2,7 +2,10 @@ from pathlib import Path
 
 import fire
 
-from SAE.sae import Sae
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from msae_wrapper import Sae  # MSAE wrapper
 
 
 def load_sae_model(

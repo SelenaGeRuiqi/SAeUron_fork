@@ -11,7 +11,10 @@ from tqdm import tqdm
 
 import utils.hooks as hooks
 from SAE.hooked_sd_noised_pipeline import HookedStableDiffusionPipeline
-from SAE.sae import Sae
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from msae_wrapper import Sae  # MSAE wrapper
 from SAE.unlearning_utils import compute_feature_importance
 
 sys.path.append("..")

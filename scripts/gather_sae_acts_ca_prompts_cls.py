@@ -9,7 +9,10 @@ import torch
 from diffusers.utils.import_utils import is_xformers_available
 
 from SAE.hooked_sd_noised_pipeline import HookedStableDiffusionPipeline
-from SAE.sae import Sae
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from msae_wrapper import Sae  # MSAE wrapper
 from UnlearnCanvas_resources.const import class_available
 
 torch.backends.cuda.matmul.allow_tf32 = True

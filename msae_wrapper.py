@@ -403,6 +403,28 @@ class MSAEWrapper(nn.Module):
             'k': self.k
         }
 
+    @classmethod
+    def load_from_disk(cls, path: str, device: str = "cuda", **kwargs):
+        """
+        SAeUron compatibility method - maps to load_from_checkpoint
+        """
+        # For MSAE, we expect the path to point to our checkpoint file
+        # If path is a directory, look for our checkpoint pattern
+        from pathlib import Path
+        path_obj = Path(path)
+        
+        if path_obj.is_dir():
+            # Look for MSAE checkpoint in the directory
+            msae_files = list(path_obj.glob("*.pth"))
+            if msae_files:
+                checkpoint_path = str(msae_files[0])  # Use first .pth file found
+            else:
+                raise FileNotFoundError(f"No .pth checkpoint found in {path}")
+        else:
+            checkpoint_path = str(path)
+        
+        return cls.load_from_checkpoint(checkpoint_path, device=device, **kwargs)
+
 # Main class alias for easy import
 Sae = MSAEWrapper
 
