@@ -163,3 +163,7 @@ cython_debug/
 #.idea/
 
 wandb/
+
+model_checkpoints/
+sae_ckpts/
+activations_poc/
