@@ -303,7 +303,12 @@ def main():
         "Van Gogh style sunflowers with swirling yellow petals",
         "A starry night sky painted in Van Gogh's distinctive swirling style", 
         "Van Gogh style wheat field with dramatic brushwork and movement",
-        "A café scene painted in Van Gogh's expressive brushstroke technique"
+        "A café scene painted in Van Gogh's expressive brushstroke technique",
+        "Van Gogh style cypress trees with dark swirling forms",
+        "A bedroom interior in Van Gogh's post-impressionist style",
+        "Van Gogh style landscape with thick paint and vibrant colors",
+        "A portrait of a peasant in Van Gogh's characteristic style",
+        "Van Gogh style still life with bold brushstrokes and bright colors"
     ]
     
     # Generate comparison images

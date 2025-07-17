@@ -1,0 +1,43 @@
+{
+  "evaluation_type": "UnlearnCanvas",
+  "results": [
+    {
+      "model": "sae",
+      "num_images": 10,
+      "unlearning_accuracy": 0.4,
+      "content_preservation": 0.864208984375,
+      "fid_score": 3176.775672056616,
+      "semantic_consistency": null,
+      "style_reduction": 0.00347900390625,
+      "original_van_gogh_score": 0.25872802734375,
+      "unlearned_van_gogh_score": 0.2552490234375,
+      "detected_concept_count": 6,
+      "success_rate": 0.4,
+      "effectiveness_score": 0.00347900390625,
+      "unlearncanvas_score": 0.5392626953124999
+    },
+    {
+      "model": "msae",
+      "num_images": 10,
+      "unlearning_accuracy": 0.6,
+      "content_preservation": 0.83095703125,
+      "fid_score": 4078.2477501533167,
+      "semantic_consistency": null,
+      "style_reduction": 0.002709960937499978,
+      "original_van_gogh_score": 0.25872802734375,
+      "unlearned_van_gogh_score": 0.25601806640625,
+      "detected_concept_count": 4,
+      "success_rate": 0.6,
+      "effectiveness_score": 0.002709960937499978,
+      "unlearncanvas_score": 0.6692871093749999
+    }
+  ],
+  "evaluation_timestamp": "2025-07-17T14:34:35.026306",
+  "log_file": "log/evaluation_log/unlearncanvas_evaluation_20250717_143424.log",
+  "metrics_description": {
+    "unlearning_accuracy": "Primary metric: 1 - (detected_concept_count / total_images)",
+    "content_preservation": "CLIP feature similarity between original and unlearned",
+    "fid_score": "Frechet Inception Distance between image distributions",
+    "style_reduction": "Reduction in Van Gogh style CLIP scores"
+  }
+}
