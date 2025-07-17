@@ -301,9 +301,9 @@ def main():
     test_prompts = [
         "A self-portrait in Van Gogh's style with thick impasto brushstrokes",
         "Van Gogh style sunflowers with swirling yellow petals",
-        "A starry night sky painted in Van Gogh's distinctive swirling style",
-        "A photorealistic self-portrait with smooth, detailed brushwork",
-        "Realistic sunflowers painted in classical realism style"
+        "A starry night sky painted in Van Gogh's distinctive swirling style", 
+        "Van Gogh style wheat field with dramatic brushwork and movement",
+        "A café scene painted in Van Gogh's expressive brushstroke technique"
     ]
     
     # Generate comparison images
